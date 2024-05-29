@@ -4,15 +4,25 @@
 #include <ESPmDNS.h>
 #include <DHT.h>
 
+// Configurare detalii rețea WiFi
 const char *ssid = "My-Network";
 const char *password = "chaker123456";
+
+// Setarea adresei IP statice
+IPAddress local_IP(192.168.1.184);
+IPAddress gateway(192.168.1.1);
+IPAddress subnet(255.255.255.0);
+IPAddress primaryDNS(8.8.8.8);  // Opțional
+IPAddress secondaryDNS(8.8.4.4);  // Opțional
 
 WebServer server(80);
 DHT dht(26, DHT11);
 
+// Funcție pentru gestionarea cererii către pagina principală
 void handleRoot() {
   char msg[1500];
 
+  // Creare conținut HTML
   snprintf(msg, 1500,
            "<html>\
   <head>\
@@ -46,19 +56,25 @@ void handleRoot() {
 </html>",
            readDHTTemperature(), readDHTHumidity()
           );
+  
+  // Trimiterea răspunsului către client
   server.send(200, "text/html", msg);
 }
 
 void setup(void) {
-
   Serial.begin(115200);
   dht.begin();
   
-  WiFi.mode(WIFI_STA);
+  // Configurare modul Wi-Fi cu IP static
+  if (!WiFi.config(local_IP, gateway, subnet, primaryDNS, secondaryDNS)) {
+    Serial.println("STA Failed to configure");
+  }
+  
+  // Conectare la rețeaua Wi-Fi
   WiFi.begin(ssid, password);
   Serial.println("");
 
-  // Wait for connection
+  // Așteptare conectare Wi-Fi
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
@@ -70,43 +86,44 @@ void setup(void) {
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
 
+  // Inițializare mDNS
   if (MDNS.begin("esp32")) {
     Serial.println("MDNS responder started");
   }
+
+  // Setare ruta pentru pagina principală
   server.on("/", handleRoot);
 
+  // Pornire server web
   server.begin();
   Serial.println("HTTP server started");
 }
 
 void loop(void) {
+  // Gestionare cereri clienți
   server.handleClient();
-  delay(2);//allow the cpu to switch to other tasks
+  delay(2); // Permite CPU-ului să gestioneze alte sarcini
 }
 
-
+// Funcție pentru citirea temperaturii de la senzorul DHT
 float readDHTTemperature() {
-  // Sensor readings may also be up to 2 seconds
-  // Read temperature as Celsius (the default)
   float t = dht.readTemperature();
-  if (isnan(t)) {    
+  if (isnan(t)) {
     Serial.println("Failed to read from DHT sensor!");
     return -1;
-  }
-  else {
+  } else {
     Serial.println(t);
     return t;
   }
 }
 
+// Funcție pentru citirea umidității de la senzorul DHT
 float readDHTHumidity() {
-  // Sensor readings may also be up to 2 seconds
   float h = dht.readHumidity();
   if (isnan(h)) {
     Serial.println("Failed to read from DHT sensor!");
     return -1;
-  }
-  else {
+  } else {
     Serial.println(h);
     return h;
   }
